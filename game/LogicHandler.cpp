@@ -1,35 +1,24 @@
 #include "LogicHandler.h"
 
-#define WIDTH 640	//window default width
-#define HEIGHT 480	//window default height
-#define TITLE "game title"
-
-sf::RectangleShape shape;
+#define WIDTH 800	//window default width
+#define HEIGHT 600	//window default height
+#define TITLE "Centa Chicken Vs. Russian Chicken"
 
 //CONSTRUCTOR
 LogicHandler::LogicHandler(void){
 	titleScreen = true;
 	elapsedTime = 1;
 
-	window = new sf::RenderWindow(sf::VideoMode(WIDTH, HEIGHT), TITLE, sf::Style::Close);
+	window = new sf::RenderWindow(sf::VideoMode(WIDTH, HEIGHT), TITLE);
 
-	shape.setSize(sf::Vector2f(10.0f, 10.0f));
-	if(!LogicHandler::loadTextures("res/")){
-		shape.setFillColor(sf::Color::Red);
-	}else{
-		shape.setFillColor(sf::Color::Green);
-	}
-
-	titleScreenBg.setTexture(*textureList.at(0));
-	titleScreenBg.setPosition(0, 0);
+	loadRes("res/");
 
 	setupSprites();
-
-	window->setFramerateLimit(0);
 }
 
 void LogicHandler::setupSprites(void){
-	//setup all sprites
+	guiHandler = new GuiHandler();
+	guiHandler->setupGui();
 }
 
 //DESTRUCTOR
@@ -52,16 +41,15 @@ void LogicHandler::run(void){
 
 		window->clear(sf::Color(20, 180, 255));
 
-		//render
-		if(titleScreen){
-			window->draw(titleScreenBg);
-		}else{
-			for(int i = 0; i < spriteList.size(); i++){
-				window->draw(*spriteList.at(i));
-			}
+		for(int i = 0; i < guiList.size(); i++){
+			window->draw(*guiList.at(i));
+		}for(int i = 0; i < fgList.size(); i++){
+			window->draw(*guiList.at(i));
+		}for(int i = 0; i < mgList.size(); i++){
+			window->draw(*guiList.at(i));
+		}for(int i = 0; i < bgList.size(); i++){
+			window->draw(*guiList.at(i));
 		}
-
-		window->draw(shape);
 		
 		deltaTime = (double)clock.getElapsedTime().asMicroseconds();
 
@@ -72,7 +60,11 @@ void LogicHandler::run(void){
 void LogicHandler::update(double delta){
 	elapsedTime += (delta * 0.00001);
 
-	//update game objects
+	for(int i = 0; i < guiList.size(); i++){
+		if(guiList.at(i) == NULL){
+			guiList.erase(guiList.begin() + i - 1);
+		}
+	}
 }
 
 void LogicHandler::handleEvent(sf::Event evt){
@@ -84,28 +76,72 @@ void LogicHandler::handleEvent(sf::Event evt){
 	}
 }
 
-bool LogicHandler::loadTextures(std::string dir){
+void LogicHandler::addGuiObj(GuiObject *object){
+	guiList.push_back(object);
+}
+
+bool LogicHandler::loadRes(std::string dir){
 	std::string line;
 	std::vector<sf::Texture*> textures;
 
 	std::ifstream file(dir + "res.txt");
 
 	if(file.is_open()){
+		std::cout <<  ":: line | index | loaded +/- ::::: loading from \"" << dir << "\" ::" << std::endl;
+
+		for(int i = 0; i < 53 + dir.length(); i++){
+			std::cout << ":";
+		}
+		std::cout << std::endl;
+		
 		while(file.good()){
+			skip:
 			std::getline(file, line);
 			
-			std::cout << "res: " << line;
+			std::cout <<  ":: " << line;
 
-			sf::Texture *tex;
-			tex = new sf::Texture;
-			if(!tex->loadFromFile( dir + line)){
-				return false;
+			if(line.empty() || line.length() <= 3){
+				std::cout << "\n"; 
+				goto skip;
 			}
-			textures.push_back(tex);
-			
-			std::cout << " loaded" << std::endl;
+
+			if(line.at(0) != '#' && line.length() > 3){
+				if(line.substr(line.length() - 3, 3) == "png"){
+					sf::Texture *tex;
+					tex = new sf::Texture;
+
+					if(!tex->loadFromFile(dir + line)){
+						delete tex;
+						std::cout << "-" << std::endl;
+						goto skip;
+					}
+
+					textures.push_back(tex);
+					std::cout << " | " << textures.size() - 1 << " | ";
+					std::cout << "+";
+				}else if(line.substr(line.length() - 3, 3) == "ogg"){
+					sf::SoundBuffer *buffer;
+					buffer = new sf::SoundBuffer();
+
+					if(!buffer->loadFromFile(dir + line)){
+						delete buffer;
+						std::cout << "-" << std::endl;
+						goto skip;
+					}
+
+					std::cout << "+";
+				}else if(line.substr(line.length() - 3, 3) == "wav"){
+
+				}
+			}
+
+			std::cout << std::endl;
 		}
 		file.close();
+
+		for(int i = 0; i < 53 + dir.length(); i++){
+			std::cout << ":";
+		}
 	}else{
 		return false;
 	}
