@@ -1,7 +1,5 @@
 #include "LogicHandler.h"
 
-#define WIDTH 800	//window default width
-#define HEIGHT 600	//window default height
 #define TITLE "Centa Chicken Vs. Russian Chicken"
 
 //CONSTRUCTOR
@@ -9,16 +7,21 @@ LogicHandler::LogicHandler(void){
 	titleScreen = true;
 	elapsedTime = 1;
 
-	window = new sf::RenderWindow(sf::VideoMode(WIDTH, HEIGHT), TITLE);
+	width = 800;
+	height = 600;
 
+	window = new sf::RenderWindow(sf::VideoMode(width, height), TITLE);
+
+	stateHandler = new StateHandler(&width, &height, this, window);
+	stateHandler->loading(window);
 	loadRes("res/");
+	stateHandler->loaded();
 
 	setupSprites();
 }
 
 void LogicHandler::setupSprites(void){
-	guiHandler = new GuiHandler();
-	guiHandler->setupGui();
+	stateHandler->setupGui();
 }
 
 //DESTRUCTOR
@@ -30,59 +33,67 @@ void LogicHandler::run(void){
 
 	double deltaTime = 0;
 	sf::Clock clock;
+
+	double startTime, endTime;
 	while (window->isOpen()){
-		sf::Event event;
-		while (window->pollEvent(event)){
-			handleEvent(event);
+		startTime = clock.getElapsedTime().asMicroseconds();
+
+		sf::Event evt;
+		while (window->pollEvent(evt)){
+			handleEvent(evt);
         }
-		
-		clock.restart();
+
 		LogicHandler::update(deltaTime);
+		LogicHandler::render();
 
-		window->clear(sf::Color(20, 180, 255));
+		long sleepTime = ((float)1 / (float)60) * 1000;
 
-		for(int i = 0; i < guiList.size(); i++){
-			window->draw(*guiList.at(i));
-		}for(int i = 0; i < fgList.size(); i++){
-			window->draw(*guiList.at(i));
-		}for(int i = 0; i < mgList.size(); i++){
-			window->draw(*guiList.at(i));
-		}for(int i = 0; i < bgList.size(); i++){
-			window->draw(*guiList.at(i));
-		}
-		
-		deltaTime = (double)clock.getElapsedTime().asMicroseconds();
+		sf::sleep(sf::milliseconds(sleepTime));
 
-		window->display();
+		endTime = clock.getElapsedTime().asMicroseconds();
+
+		deltaTime = endTime - startTime;
     }
+}
+
+void LogicHandler::handleEvent(sf::Event evt){
+	if(evt.type == sf::Event::Closed){
+		window->close();
+	}else if(evt.type == sf::Event::KeyPressed){
+       stateHandler->keyPressed(evt.key.code);
+	}else if(evt.type == sf::Event::MouseButtonPressed){
+		stateHandler->mousePressed(evt.mouseButton.button);
+	}
+}
+
+void LogicHandler::render(void){
+	window->clear(sf::Color(20, 180, 255));
+
+	if(stateHandler->getCurrentState() != NULL){
+		for(int list = 0; list < stateHandler->getCurrentState()->getSpriteList()->size(); list++){
+			window->draw(*stateHandler->getCurrentState()->getSpriteList()->at(list)->getDrawable());
+		}
+	}
+
+	window->display();
 }
 
 void LogicHandler::update(double delta){
 	elapsedTime += (delta * 0.00001);
 
-	for(int i = 0; i < guiList.size(); i++){
-		if(guiList.at(i) == NULL){
-			guiList.erase(guiList.begin() + i - 1);
-		}
-	}
+	stateHandler->update(delta);
 }
 
-void LogicHandler::handleEvent(sf::Event evt){
-	if (evt.type == sf::Event::Closed){
-		window->close();
-	}else if((evt.type == sf::Event::KeyPressed ||
-		evt.type == sf::Event::MouseButtonPressed) && titleScreen){
-			titleScreen = false;
+sf::Texture* LogicHandler::getTexture(std::string index){
+	if(textureList.count(index) > 0){
+		return textureList[index];
+	}else{
+		return textureList["null_img.png"];
 	}
-}
-
-void LogicHandler::addGuiObj(GuiObject *object){
-	guiList.push_back(object);
 }
 
 bool LogicHandler::loadRes(std::string dir){
 	std::string line;
-	std::vector<sf::Texture*> textures;
 
 	std::ifstream file(dir + "res.txt");
 
@@ -116,8 +127,8 @@ bool LogicHandler::loadRes(std::string dir){
 						goto skip;
 					}
 
-					textures.push_back(tex);
-					std::cout << " | " << textures.size() - 1 << " | ";
+					textureList[line] = tex;
+					std::cout << " | index:" << line << ": | ";
 					std::cout << "+";
 				}else if(line.substr(line.length() - 3, 3) == "ogg"){
 					sf::SoundBuffer *buffer;
@@ -128,6 +139,11 @@ bool LogicHandler::loadRes(std::string dir){
 						std::cout << "-" << std::endl;
 						goto skip;
 					}
+
+					sf::Sound *player = new sf::Sound();
+					player->setBuffer(*buffer);
+					//player->play();
+					player->setLoop(true);
 
 					std::cout << "+";
 				}else if(line.substr(line.length() - 3, 3) == "wav"){
@@ -142,10 +158,10 @@ bool LogicHandler::loadRes(std::string dir){
 		for(int i = 0; i < 53 + dir.length(); i++){
 			std::cout << ":";
 		}
+		std::cout << "\n";
 	}else{
 		return false;
 	}
 
-	textureList = textures;
 	return true;
 }
